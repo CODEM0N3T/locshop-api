@@ -1,1 +1,2 @@
-# locshop-api
+# locshop-api (Node.js + Express.js)
+
