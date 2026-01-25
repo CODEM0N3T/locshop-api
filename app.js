@@ -1,3 +1,4 @@
+const servicesRouter = require("./routes/services");
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
@@ -8,6 +9,9 @@ const { PORT = 3004 } = process.env;
 
 app.use(cors());
 app.use(express.json());
+
+app.get("/", (req, res) => res.send("API is running"));
+app.use("/services", servicesRouter);
 
 //created and connected to mongoDB database
 mongoose

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const serviceSchema = new mongoose.Schema({
   name: {
@@ -9,7 +9,7 @@ const serviceSchema = new mongoose.Schema({
   durationMins: {
     type: Number,
     required: true,
-    min: 120,
+    min: 30,
   },
   price: {
     type: Number,
@@ -26,4 +26,6 @@ const serviceSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("Service", serviceSchema);
+const Service = mongoose.model("Service", serviceSchema);
+ module.exports = Service;
+// console.log(Service);
