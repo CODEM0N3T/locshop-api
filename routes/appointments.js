@@ -29,6 +29,7 @@ router.post("/", async (req, res) => {
     if (!service) {
       return res.status(404).json({ error: "Service doesn't exist" });
     }
+    //
     const serviceDuration = service.durationMins; //reading a property
     const startIndex = SLOTS.indexOf(slot);
     if (startIndex === -1) {
