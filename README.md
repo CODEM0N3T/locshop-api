@@ -1,3 +1,3 @@
 # locshop-api (Node.js + Express.js)
 
-Personal Loctitian Web application
+Personal Loctitian Web Application
