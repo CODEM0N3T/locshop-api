@@ -1,7 +1,9 @@
 const router = require("express").Router();
+const mongoose = require("mongoose");
 const Appointment = require("../models/appointment"); //Appointment Schema
 const Service = require("../models/service"); //Service Schema, needed specifice data to be able to ook appointments
 const { SLOTS, SLOT_SIZE_MINS } = require("../slots.js"); //slot times
+const BookedSlot = require("../models/bookedSlot");
 
 router.get("/available", async (req, res) => {
   //get request logic to the server
@@ -37,45 +39,77 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
+  const session = await mongoose.startSession();
+
   //post request
   try {
+    session.startTransaction();
     const { serviceId, slot, date } = req.body; //JSON body
+
     if (!serviceId || !slot || !date) {
       // validate that serviceId, slot, and date exist
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: "Missing fields" }); //Bad request
     }
-    const service = await Service.findById(serviceId); //finding service id in Service DB
+
+    const service = await Service.findById(serviceId).session(session); //finding service id in Service DB
+
     if (!service) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(404).json({ error: "Service doesn't exist" }); //Service Not Found
     }
-    const serviceDuration = service.durationMins; //reading service property duration of service
+
     const startIndex = SLOTS.indexOf(slot); //finds the start index of slot
+
     if (startIndex === -1) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: "Invalid Slot" }); //Bade request
     }
-    const slotsNeeded = Math.ceil(serviceDuration / SLOT_SIZE_MINS); //calculates the amount of slots needed, slots are 30 mins each, ceil to round up 4:15 rounds to 4:30
+
+    const slotsNeeded = Math.ceil(service.durationMins / SLOT_SIZE_MINS); //calculates the amount of slots needed, slots are 30 mins each, ceil to round up 4:15 rounds to 4:30
     const reservedSlots = SLOTS.slice(startIndex, startIndex + slotsNeeded); //reserved slots including start index -> start index + slots needed
-    const conflict = await Appointment.findOne({
-      date,
-      status: "booked",
-      reservedSlots: { $in: reservedSlots },
-    }); //checks if the database already has an appointment reserved at date
+
     if (reservedSlots.length !== slotsNeeded) {
       //if the reserved slot is past the slot needed it is past closing time
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ error: "Past Closing Time" }); //Bad request
     }
-    if (conflict) {
-      return res.status(409).json({ error: "Taken Slot", reservedSlots }); //if conflict error request conflict
-    }
-    const newAppointment = new Appointment({
-      ...req.body,
-      reservedSlots,
-      status: "booked",
-    }); //creates a new appointment if everything checks
 
-    const saveAppointment = await newAppointment.save(); //saves and validates appointment
-    return res.status(201).json(saveAppointment); //responds to client with appoinment doc
+    const savedAppointment = await Appointment.create(
+      [
+        {
+          ...req.body,
+          reservedSlots,
+          status: "booked",
+        },
+      ],
+      { session },
+    ); //create appointment
+
+    const slotDocs = reservedSlots.map((s) => ({
+      date,
+      slot: s,
+      appointmentId: savedAppointment[0]._id,
+    }));
+
+    await BookedSlot.insertMany(slotDocs, { session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json(savedAppointment[0]); //responds to client with appoinment doc
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    if (error && error.code === 11000) {
+      return res.status(409).json({ error: "Taken Slot" }); //Bad request
+    }
+
     return res.status(400).json({ error: error.message }); //Bad request
   }
 });
@@ -104,6 +138,7 @@ router.patch("/:id/cancel", async (req, res) => {
       return res.status(404).json({ error: "Appointment Not Found" });
     } //if not found
 
+    await BookedSlot.deleteMany({ appointmentId: id });
     return res.status(200).json(updateCancel); //send updated doc
   } catch (error) {
     return res.status(400).json({ error: error.message }); //bad request
