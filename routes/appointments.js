@@ -60,9 +60,9 @@ router.post("/", async (req, res) => {
       session.endSession();
       return res.status(404).json({ error: "Service doesn't exist" }); //Service Not Found
     }
-
-    const startIndex = SLOTS.indexOf(slot); //finds the start index of slot
-
+    //
+    const serviceDuration = service.durationMins; //reading a property
+    const startIndex = SLOTS.indexOf(slot);
     if (startIndex === -1) {
       await session.abortTransaction();
       session.endSession();
