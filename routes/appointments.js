@@ -39,11 +39,11 @@ router.get("/", async (req, res) => {
 });
 
 router.post("/", async (req, res) => {
-  const session = await mongoose.startSession();
+  const session = await mongoose.startSession(); //allows database actions to happen together safely
 
   //post request
   try {
-    session.startTransaction();
+    session.startTransaction(); //start recording changes
     const { serviceId, slot, date } = req.body; //JSON body
 
     if (!serviceId || !slot || !date) {
